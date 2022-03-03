@@ -1,3 +1,4 @@
+import sys
 import requests
 import re
 import pandas as pd
@@ -17,7 +18,7 @@ ip = "http://192.168.4.1/"
 ap_name = "ESP32-Access-Point"
 value_file = "data\\values.csv"
 raw_data_file = "data\\raw_data.csv"
-rps = 20       #records per seconds
+rps = 100       #records per seconds
 tpr = 1/rps     #time in seconds per record
 rec_time = 5    #time in seconds for recording
 
@@ -57,16 +58,18 @@ class MyGridLayout(Widget):
     
     def getValuesThread(self):
         self.println('try to download data from esp32 . . .')
-        r = requests.get(ip + "get")
-        if not r.ok:
+        try:
+            r = requests.get(ip + "get", timeout=3)
+        except:
             self.println('failed to download data, check connection!')
-        else:
-            self.println('successfully downloaded data')
-            self.println('writing to raw file')
-            file = open(raw_data_file, "w")
-            file.write(re.sub("(\r\n)+", "\n", r.text))
-            file.close()
-            self.correctValues()
+            sys.exit()
+        
+        self.println('successfully downloaded data')
+        self.println('writing to raw file')
+        file = open(raw_data_file, "w")
+        file.write(re.sub("(\r\n)+", "\n", r.text))
+        file.close()
+        self.correctValues()
 
     def correctValues(self):
         self.println('correcting data')
