@@ -83,6 +83,11 @@ void loop() {
             } else if (header.indexOf("GET /get") >= 0) {
               client.println("time,accX,accY,accZ,rotX,rotY,rotZ,temp1,temp2,press");
               for (short row = 0; row < max_values; row = row + 10) {
+                int sum = 0;
+                for (byte column = 0; column < 10; column++) {
+                  sum += vals[row + column];
+                }
+                if(sum == 0) goto stop_get;
                 for (byte column = 0; column < 10; column++) {
                   if (column < 9) {
                     client.print(vals[row + column]);
@@ -93,6 +98,7 @@ void loop() {
                 }
               }
             }
+            stop_get:
             client.println();
             break;
           } else {
