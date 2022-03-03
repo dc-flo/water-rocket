@@ -15,8 +15,8 @@ Config.set('graphics', 'window_state', 'maximized')
 
 ip = "http://192.168.4.1/"
 ap_name = "ESP32-Access-Point"
-value_file = "values.csv"
-raw_data_file = "raw_data.csv"
+value_file = "data\\values.csv"
+raw_data_file = "data\\raw_data.csv"
 rps = 20       #records per seconds
 tpr = 1/rps     #time in seconds per record
 rec_time = 5    #time in seconds for recording
@@ -40,7 +40,7 @@ class MyGridLayout(Widget):
     def start(self):
         if self.checkWifi():
             requests.get(ip + f'start?rec_time={rec_time}&rps={rps}')
-            self.println(f'started recording data for {rec_time} seconds ...')
+            self.println(f'started recording data for {rec_time} seconds . . .')
             evt = Clock.schedule_interval(lambda dt: self.print('. '), 1)
             Clock.schedule_once(lambda dt: evt.cancel(), rec_time)
             Clock.schedule_once(lambda dt: self.println('finished recording'), rec_time)
@@ -56,14 +56,21 @@ class MyGridLayout(Widget):
         threading.Thread(target=self.getValuesThread).start()
     
     def getValuesThread(self):
+        self.println('try to download data from esp32 . . .')
         r = requests.get(ip + "get")
-        file = open(raw_data_file, "w")
-        file.write(re.sub("(\r\n)+", "\n", r.text))
-        file.close()
-        self.correctValues()
+        if not r.ok:
+            self.println('failed to download data, check connection!')
+        else:
+            self.println('successfully downloaded data')
+            self.println('writing to raw file')
+            file = open(raw_data_file, "w")
+            file.write(re.sub("(\r\n)+", "\n", r.text))
+            file.close()
+            self.correctValues()
 
     def correctValues(self):
-        values = pd.read_csv(value_file)
+        self.println('correcting data')
+        values = pd.read_csv(raw_data_file)
         values["accX"] = round(values["accX"] - values["accX"][0], 2)
         values["accY"] = round(values["accY"] - values["accY"][0], 2)
         values["accZ"] = round(values["accZ"] - values["accZ"][0], 2)
@@ -71,7 +78,6 @@ class MyGridLayout(Widget):
         values["rotY"] = round(values["rotY"] - values["rotY"][0], 2)
         values["rotZ"] = round(values["rotZ"] - values["rotZ"][0], 2)
         values["time"] = round(values["time"] - values["time"][0], 2)
-        values.drop(0)
         values.to_csv(value_file, index=False)
         self.completeValues()
 
@@ -82,6 +88,7 @@ class MyGridLayout(Widget):
         return ivals
 
     def completeValues(self):
+        self.println('completing data')
         values = pd.read_csv(value_file)
         values['velX'] = self.integrate(values['accX'])
         values['velY'] = self.integrate(values['accY'])
@@ -94,6 +101,7 @@ class MyGridLayout(Widget):
         values['rposZ'] = self.integrate(values['rotZ'])
         values.drop(0)
         values.to_csv(value_file, index=False)
+        self.println('finished data gathering')
 
     def printValues(self):
         self.print(pd.read_csv(value_file))
