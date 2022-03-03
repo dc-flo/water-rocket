@@ -32,6 +32,10 @@
             size_hint: (0.5, 0.3)
 
             Button:
+                text: "clear console log"
+                on_press: root.log_clear()
+
+            Button:
                 text: "start recording"
                 on_press: root.start()
 

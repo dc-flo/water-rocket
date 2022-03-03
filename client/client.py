@@ -124,7 +124,10 @@ class MyGridLayout(Widget):
             self.loglabel.text = self.loglabel.text + f'[color=f7f72a]{text}[/color]'
         if type == 'error':
             self.loglabel.text = self.loglabel.text + f'[color=ff3333]{text}[/color]'
-
+    
+    def log_clear(self):
+        self.loglabel.text = ""
+        
 class MyApp(App):
     def on_stop(self):
         self.root.stop.set()
