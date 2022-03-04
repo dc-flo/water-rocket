@@ -7,7 +7,7 @@ from kivy.app import App
 from kivy.uix.widget import Widget
 import threading
 from kivy.clock import Clock
-from kivy.properties import ObjectProperty
+from kivy.properties import ObjectProperty, NumericProperty
 import subprocess
 import os
 from kivy.config import Config
@@ -22,15 +22,29 @@ rps = 100       #records per seconds
 tpr = 1/rps     #time in seconds per record
 rec_time = 5    #time in seconds for recording
 
+root = None
+graphlayout = None
+
 class MyAddButton(Widget):
-    pass
+    
+    def addGraph(self):
+        graphlayout.remove_widget(self)
+        graphlayout.add_widget(MyGraph())
+        graphlayout.add_widget(self)
+
 
 class MyGraph(Widget):
     pass
 
 class MyGridLayout(Widget):
-
+    
     loglabel = ObjectProperty(None)
+    gridheight = NumericProperty(1000)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        global graphlayout, gridheight
+        graphlayout = self.ids.graphlayout
 
     def connectToWifi(self):
         if os.system(f'cmd /c "netsh wlan connect name=\"{ap_name}\""') == 1:
@@ -133,7 +147,9 @@ class MyApp(App):
         self.root.stop.set()
 
     def build(self):
-        return MyGridLayout()
+        global root
+        root = MyGridLayout()
+        return root
 
 def main():
     MyApp().run()

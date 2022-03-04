@@ -3,14 +3,24 @@
 <MyGridLayout>:
     loglabel: loglabel
     graphlayout: graphlayout
+
     FloatLayout:
         size: root.width, root.height
 
-        GridLayout:
-            id: graphlayout
-            cols:2
+        ScrollView:
             pos_hint: {"top":1}
             size_hint: (1, 0.7)
+            size: self.size
+            do_scroll_y: True
+
+            GridLayout:
+                id: graphlayout
+                size_hint_y: None
+                row_default_height: self.height*0.5
+                row_force_default: True
+                height: root.gridheight
+                cols:2
+                MyAddButton:
 
         ScrollView:
             do_scroll_x: True
@@ -51,33 +61,40 @@
                 text: "connect to AP"
                 on_press: root.connectToWifi()
 
-<MyAddButton>:
+<MyAddButton@Widget>:
     GridLayout:
+        size: self.parent.size
+        pos: self.parent.pos
         cols:2
         size_hint: (1, 0.7)
+        
         Label:
-            text: "ara ara"
+            text: "add graph"
         Button:
             text: "UwU"
             on_press: root.addGraph()
     
-<MyGraph>:
-    Graph:
-        id:graph
-        plot: MeshLinePlot
-        xlabel:'X'
-        ylabel:'Y'
-        x_ticks_minor:5
-        x_tics_major:25
-        y_ticks_major:1
-        y_grid_label:True
-        x_grid_label:True
-        padding:5
-        x_grid:True
-        y_grid:True
-        xmin:-0
-        xmax:100
-        ymin:-1
-        ymax:1
-        pos: 0, root.height / 6
-        size: root.width * 2 / 3 , root.height * 18 / 24
+<MyGraph@Widget>:
+    GridLayout:
+        size: self.parent.size
+        pos: self.parent.pos
+        cols:1
+        size_hint: (1, 0.7)
+        Graph:
+            size: self.size
+            pos: self.pos
+            plot: MeshLinePlot
+            xlabel:'X'
+            ylabel:'Y'
+            x_ticks_minor:5
+            x_tics_major:25
+            y_ticks_major:1
+            y_grid_label:True
+            x_grid_label:True
+            padding:5
+            x_grid:True
+            y_grid:True
+            xmin:-0
+            xmax:100
+            ymin:-1
+            ymax:1
