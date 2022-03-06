@@ -19,6 +19,51 @@ int max_values = rps * rec_time * 10;
 float vals[20000];
 unsigned short i = 0;
 
+void saveVals() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  vals[i] = millis();
+  i++;
+  vals[i] = a.acceleration.x;
+  i++;
+  vals[i] = a.acceleration.y;
+  i++;
+  vals[i] = a.acceleration.z;
+  i++;
+  vals[i] = g.gyro.x;
+  i++;
+  vals[i] = g.gyro.y;
+  i++;
+  vals[i] = g.gyro.z;
+  i++;
+  vals[i] = temp.temperature;
+  i++;
+  vals[i] = bmp.readTemperature();
+  i++;
+  vals[i] = bmp.readPressure();
+  i++;
+}
+
+bool waitInterval(unsigned long &expireTime, unsigned long timePeriod) {
+  unsigned long currentMillis = millis();
+  if (currentMillis - expireTime >= timePeriod) {
+    expireTime = currentMillis;
+    return true;
+  }
+  else return false;
+}
+
+String getParam(String key) {
+  String s = header.substring(header.indexOf(key));
+  s.remove(0, key.length());
+  if (s.indexOf("&") != -1) {
+    s = s.substring(0, s.indexOf("&"));
+  } else {
+    s = s.substring(0, s.indexOf(" "));
+  }
+  return s;
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -122,49 +167,4 @@ void loop() {
       Serial.println("finished rec");
     }
   }
-}
-
-void saveVals() {
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  vals[i] = millis();
-  i++;
-  vals[i] = a.acceleration.x;
-  i++;
-  vals[i] = a.acceleration.y;
-  i++;
-  vals[i] = a.acceleration.z;
-  i++;
-  vals[i] = g.gyro.x;
-  i++;
-  vals[i] = g.gyro.y;
-  i++;
-  vals[i] = g.gyro.z;
-  i++;
-  vals[i] = temp.temperature;
-  i++;
-  vals[i] = bmp.readTemperature();
-  i++;
-  vals[i] = bmp.readPressure();
-  i++;
-}
-
-bool waitInterval(unsigned long &expireTime, unsigned long timePeriod) {
-  unsigned long currentMillis = millis();
-  if (currentMillis - expireTime >= timePeriod) {
-    expireTime = currentMillis;
-    return true;
-  }
-  else return false;
-}
-
-String getParam(String key) {
-  String s = header.substring(header.indexOf(key));
-  s.remove(0, key.length());
-  if (s.indexOf("&") != -1) {
-    s = s.substring(0, s.indexOf("&"));
-  } else {
-    s = s.substring(0, s.indexOf(" "));
-  }
-  return s;
 }
