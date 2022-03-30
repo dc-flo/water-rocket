@@ -50,21 +50,22 @@ void handle_get(){
 }
 
 void handle_start(){
+  rec_time = 20;
+  rps = 100;
   for(char j = 0; j < server.args(); j++){
-    if(server.argName(i) == "rec_time"){
-      rec_time = server.arg(i).toInt();
-    } else {
-      rec_time = 20;
+    if(server.argName(j) == "rec_time"){
+      rec_time = server.arg(j).toInt();
     }
-    if(server.argName(i) == "rps"){
-      rps = server.arg(i).toInt();
-    } else {
-      rps = 100;
+    if(server.argName(j) == "rps"){
+      rps = server.arg(j).toInt();
     }
   }
   memset(vals, 0, sizeof(vals));
   i = 0;
-  Serial.println("started recording");
+  Serial.print("started recording: ");
+  Serial.print(rec_time);
+  Serial.print(" - ");
+  Serial.println(rps);
   rec_start = millis();
   is_rec = true;
   digitalWrite(ONBOARD_LED, HIGH);
