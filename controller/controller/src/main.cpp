@@ -4,10 +4,13 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
 #include <WebServer.h>
+#include <Adafruit_BME280.h>
 
 #define ONBOARD_LED 2
 
 Adafruit_BMP280 bmp;
+Adafruit_BME280 bme;
+short bm = 0;
 Adafruit_MPU6050 mpu;
 
 const char* ssid = "ESP32-Access-Point";
@@ -87,10 +90,22 @@ void saveVals() {
   i++;
   vals[i] = temp.temperature;
   i++;
-  vals[i] = bmp.readTemperature();
-  i++;
-  vals[i] = bmp.readPressure();
-  i++;
+  if(bm == 0){
+    vals[i] = bmp.readTemperature();
+    i++;
+    vals[i] = bmp.readPressure();
+    i++;
+  } else if (bm ==1) {
+    vals[i] = bme.readTemperature();
+    i++;
+    vals[i] = bme.readPressure();
+    i++;
+  } else {
+    vals[i] = -1;
+    i++;
+    vals[i] = -1;
+    i++;
+  }
 }
 
 bool waitInterval(unsigned long &expireTime, unsigned long timePeriod) {
@@ -103,7 +118,8 @@ bool waitInterval(unsigned long &expireTime, unsigned long timePeriod) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
+  Wire.begin();
 
   pinMode(ONBOARD_LED,OUTPUT);
 
@@ -113,7 +129,12 @@ void setup() {
   Serial.println("MPU6050 Found!");
 
   if (!bmp.begin(0x76)) {
-    Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+    Serial.println("bmp280 not found, try bme280");
+    bm++;
+    if(!bme.begin(0x76)){
+      Serial.println("Could not find a valid BME280 sensor, check wiring!");
+      bm++;
+    }
   }
   Serial.println("BME280 Found!");
 
