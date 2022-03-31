@@ -3,13 +3,21 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
+#include <WebServer.h>
+#include <Adafruit_BME280.h>
+
+#define ONBOARD_LED 2
 
 Adafruit_BMP280 bmp;
+Adafruit_BME280 bme;
+short bm = 0;
 Adafruit_MPU6050 mpu;
 
 const char* ssid = "ESP32-Access-Point";
-WiFiServer server(80);
-String header;
+IPAddress local_ip(192,168,1,1);
+IPAddress gateway(192,168,1,1);
+IPAddress subnet(255,255,255,0);
+WebServer server(80);
 
 bool is_rec = false;
 unsigned long rec_start = 0;
@@ -18,6 +26,51 @@ byte rps = 100;
 int max_values = rps * rec_time * 10;
 float vals[20000];
 unsigned short i = 0;
+
+void handle_get(){
+  String v = "time,accX,accY,accZ,rotX,rotY,rotZ,temp1,temp2,press\n";
+  for (short row = 0; row < max_values; row = row + 10) {
+    short sum = 0;
+    for (byte column = 0; column < 10; column++) {
+      sum += vals[row + column];
+    }
+    if(sum == 0) goto stop;
+    for (byte column = 0; column < 10; column++) {
+      if (column < 9) {
+        v += vals[row + column];
+        v += ",";
+      } else {
+        v += vals[row + column];
+        v += "\n";
+      }
+    }
+  }
+  stop:
+  server.send(200, "text/csv", v);
+}
+
+void handle_start(){
+  rec_time = 20;
+  rps = 100;
+  for(char j = 0; j < server.args(); j++){
+    if(server.argName(j) == "rec_time"){
+      rec_time = server.arg(j).toInt();
+    }
+    if(server.argName(j) == "rps"){
+      rps = server.arg(j).toInt();
+    }
+  }
+  memset(vals, 0, sizeof(vals));
+  i = 0;
+  Serial.print("started recording: ");
+  Serial.print(rec_time);
+  Serial.print(" - ");
+  Serial.println(rps);
+  rec_start = millis();
+  is_rec = true;
+  digitalWrite(ONBOARD_LED, HIGH);
+  server.send(200, "text/plain", "OK");
+}
 
 void saveVals() {
   sensors_event_t a, g, temp;
@@ -38,10 +91,22 @@ void saveVals() {
   i++;
   vals[i] = temp.temperature;
   i++;
-  vals[i] = bmp.readTemperature();
-  i++;
-  vals[i] = bmp.readPressure();
-  i++;
+  if(bm == 0){
+    vals[i] = bmp.readTemperature();
+    i++;
+    vals[i] = bmp.readPressure();
+    i++;
+  } else if (bm ==1) {
+    vals[i] = bme.readTemperature();
+    i++;
+    vals[i] = bme.readPressure();
+    i++;
+  } else {
+    vals[i] = -1;
+    i++;
+    vals[i] = -1;
+    i++;
+  }
 }
 
 bool waitInterval(unsigned long &expireTime, unsigned long timePeriod) {
@@ -53,19 +118,11 @@ bool waitInterval(unsigned long &expireTime, unsigned long timePeriod) {
   else return false;
 }
 
-String getParam(String key) {
-  String s = header.substring(header.indexOf(key));
-  s.remove(0, key.length());
-  if (s.indexOf("&") != -1) {
-    s = s.substring(0, s.indexOf("&"));
-  } else {
-    s = s.substring(0, s.indexOf(" "));
-  }
-  return s;
-}
-
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
+  Wire.begin();
+
+  pinMode(ONBOARD_LED,OUTPUT);
 
   if (!mpu.begin()) {
     Serial.println("Failed to find MPU6050 chip");
@@ -73,7 +130,12 @@ void setup() {
   Serial.println("MPU6050 Found!");
 
   if (!bmp.begin(0x76)) {
-    Serial.println("Could not find a valid BMP280 sensor, check wiring!");
+    Serial.println("bmp280 not found, try bme280");
+    bm++;
+    if(!bme.begin(0x76)){
+      Serial.println("Could not find a valid BME280 sensor, check wiring!");
+      bm++;
+    }
   }
   Serial.println("BME280 Found!");
 
@@ -84,86 +146,25 @@ void setup() {
   Serial.print("Setting AP (Access Point)…");
   WiFi.softAP(ssid);
   delay(100);
-  WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+  WiFi.softAPConfig(local_ip, gateway, subnet);
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
+
+  server.on("/get", handle_get);
+  server.on("/start", handle_start);
 
   server.begin();
 }
 
 void loop() {
-  WiFiClient client = server.available();
-  if (client) {
-    Serial.println("New Client.");
-    String currentLine = "";
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        Serial.write(c);
-        header += c;
-        if (c == '\n') {
-          if (currentLine.length() == 0) {
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/csv");
-            client.println("Connection: close");
-            client.println();
-
-            if (header.indexOf("GET /start") >= 0) {
-              if (header.indexOf("rec_time=") == -1) {
-                rec_time = 20;
-              } else {
-                rec_time = getParam("rec_time=").toInt();
-              }
-              if (header.indexOf("rps=") == -1) {
-                rps = 100;
-              } else {
-                rps = getParam("rps=").toInt();
-              }
-              memset(vals, 0, sizeof(vals));
-              i = 0;
-              Serial.println("started recording");
-              rec_start = millis();
-              is_rec = true;
-            } else if (header.indexOf("GET /get") >= 0) {
-              client.println("time,accX,accY,accZ,rotX,rotY,rotZ,temp1,temp2,press");
-              for (short row = 0; row < max_values; row = row + 10) {
-                short sum = 0;
-                for (byte column = 0; column < 10; column++) {
-                  sum += vals[row + column];
-                }
-                if(sum == 0) goto stop_get;
-                for (byte column = 0; column < 10; column++) {
-                  if (column < 9) {
-                    client.print(vals[row + column]);
-                    client.print(",");
-                  } else {
-                    client.println(vals[row + column]);
-                  }
-                }
-              }
-            }
-            stop_get:
-            client.println();
-            break;
-          } else {
-            currentLine = "";
-          }
-        } else if (c != '\r') {
-          currentLine += c;
-        }
-      }
-    }
-    header = "";
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
-  }
+  server.handleClient();
 
   if (is_rec && waitInterval(rec_start, 1000 / rps)) {
     saveVals();
     if (i / rps / 10 >= rec_time) {
       is_rec = false;
+      digitalWrite(ONBOARD_LED, LOW);
       Serial.println("finished rec");
     }
   }

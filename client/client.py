@@ -138,7 +138,6 @@ class MyGridLayout(Widget):
                 h.append(round(h[i-1] + (np.log(p[i]/p[i-1])/-((M*g)/(R*T[i]))), 2))
         return h
 
-
     def completeValues(self):
         self.println('completing data')
         values = pd.read_csv(value_file)
@@ -151,6 +150,9 @@ class MyGridLayout(Widget):
         values['rposX'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotX, x=np.divide(values.time, 1000), initial=0), 2)
         values['rposY'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotY, x=np.divide(values.time, 1000), initial=0), 2)
         values['rposZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotZ, x=np.divide(values.time, 1000), initial=0), 2)
+        values['tposX'] = values['posX'] * np.cos(values['rposX'])
+        values['tposY'] = values['posY'] * np.cos(values['rposY'])
+        values['tposZ'] = values['posZ'] * np.cos(values['rposZ'])
         values['barheightT1'] = self.barheight(values.press, values.temp1)
         values['barheightT2'] = self.barheight(values.press, values.temp2)
         values.drop(0)
