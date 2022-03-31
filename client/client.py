@@ -11,11 +11,9 @@ from kivy.properties import ObjectProperty, NumericProperty
 import subprocess
 import os
 from kivy.config import Config
-from sympy import integrate
 from kivy.garden.graph import Graph, MeshLinePlot
 from kivy.lang import Builder
-from kivymd.app import MDApp
-import scipy.integrate  
+import scipy.integrate
 
 ip = "http://192.168.1.1/"
 ap_name = "ESP32-Access-Point"
