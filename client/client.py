@@ -1,3 +1,4 @@
+from cmath import pi
 import sys
 import requests
 import re
@@ -145,9 +146,9 @@ class MyGridLayout(Widget):
         values['posX'] = np.round(scipy.integrate.cumulative_trapezoid(values.velX, x=np.divide(values.time, 1000), initial=0), 2)
         values['posY'] = np.round(scipy.integrate.cumulative_trapezoid(values.velY, x=np.divide(values.time, 1000), initial=0), 2)
         values['posZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.velZ, x=np.divide(values.time, 1000), initial=0), 2)
-        values['rposX'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotX, x=np.divide(values.time, 1000), initial=0), 2)
-        values['rposY'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotY, x=np.divide(values.time, 1000), initial=0), 2)
-        values['rposZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotZ, x=np.divide(values.time, 1000), initial=0), 2)
+        values['rposX'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotX, x=np.divide(values.time, 1000), initial=0)*180/pi, 2)
+        values['rposY'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotY, x=np.divide(values.time, 1000), initial=0)*180/pi, 2)
+        values['rposZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotZ, x=np.divide(values.time, 1000), initial=0)*180/pi, 2)
         values['tposX'] = values['posX'] * np.cos(values['rposX'])
         values['tposY'] = values['posY'] * np.cos(values['rposY'])
         values['tposZ'] = values['posZ'] * np.cos(values['rposZ'])

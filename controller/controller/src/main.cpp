@@ -14,6 +14,8 @@ short bm = 0;
 Adafruit_MPU6050 mpu;
 
 const char* ssid = "ESP32-Access-Point";
+const char* password = "WR2022";
+
 IPAddress local_ip(192,168,1,1);
 IPAddress gateway(192,168,1,1);
 IPAddress subnet(255,255,255,0);
@@ -26,6 +28,11 @@ byte rps = 100;
 int max_values = rps * rec_time * 10;
 float vals[20000];
 unsigned short i = 0;
+float rotX = 0;
+float rotY = 0;
+float rotZ = 0;
+
+unsigned long stream_start = 0;
 
 void handle_get(){
   String v = "time,accX,accY,accZ,rotX,rotY,rotZ,temp1,temp2,press\n";
@@ -69,7 +76,9 @@ void handle_start(){
   rec_start = millis();
   is_rec = true;
   digitalWrite(ONBOARD_LED, HIGH);
-  server.send(200, "text/plain", "OK");
+  char buf[100];
+  sprintf(buf, "recording for %d seconds with %d rps", rec_time, rps);
+  server.send(200, "text/plain", buf);
 }
 
 void saveVals() {
@@ -144,7 +153,7 @@ void setup() {
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   Serial.print("Setting AP (Access Point)…");
-  WiFi.softAP(ssid);
+  WiFi.softAP(ssid, password);
   delay(100);
   WiFi.softAPConfig(local_ip, gateway, subnet);
   IPAddress IP = WiFi.softAPIP();
@@ -155,6 +164,10 @@ void setup() {
   server.on("/start", handle_start);
 
   server.begin();
+
+  delay(100);
+
+  stream_start = millis();
 }
 
 void loop() {
@@ -167,5 +180,35 @@ void loop() {
       digitalWrite(ONBOARD_LED, LOW);
       Serial.println("finished rec");
     }
+  }
+  if(waitInterval(stream_start, 500)) {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  rotX += g.gyro.x * 0.5 * 180/PI;
+  rotY += g.gyro.y * 0.5 * 180/PI;
+  rotZ += g.gyro.z * 0.5 * 180/PI;
+
+  Serial.print("Acceleration X: ");
+  Serial.print(a.acceleration.x);
+  Serial.print(", Y: ");
+  Serial.print(a.acceleration.y);
+  Serial.print(", Z: ");
+  Serial.print(a.acceleration.z);
+  Serial.println(" m/s^2");
+
+  Serial.print("Rotation X: ");
+  Serial.print(rotX);
+  Serial.print(", Y: ");
+  Serial.print(rotY);
+  Serial.print(", Z: ");
+  Serial.print(rotZ);
+  Serial.println(" rad/s");
+
+  Serial.print("Temperature: ");
+  Serial.print(temp.temperature);
+  Serial.println(" degC");
+
+  Serial.println("");
   }
 }
