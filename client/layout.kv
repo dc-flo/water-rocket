@@ -64,8 +64,16 @@
             Button:
                 text: "correct and\ncomplete data"
                 on_press: root.correctValues()
+            Button:
+                text: "open Data"
+                on_press: root.openValues()
 
 <MyAddButton@Widget>:
+    x_input: x_input
+    y_input: y_input
+    y_min: y_min
+    y_max: y_max
+    
     GridLayout:
         size: self.parent.size
         pos: self.parent.pos
@@ -73,7 +81,29 @@
         size_hint: (0.5, 0.7)
         
         Label:
-            text: "qwq"
+            text: "X axis:"
+
+        TextInput:
+            id: x_input
+
+        Label:
+            text: "Y axis:"
+
+        TextInput:
+            id: y_input
+        
+        Label:
+            text: "Y min:"
+
+        TextInput:
+            id: y_min
+        
+        Label:
+            text: "Y max:"
+
+        TextInput:
+            id: y_max
+
         Button:
             text: "add Graph"
             on_press: root.addGraph()

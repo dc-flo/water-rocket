@@ -1,4 +1,4 @@
-from cmath import pi
+import math
 import sys
 import requests
 import re
@@ -15,46 +15,59 @@ from kivy.config import Config
 from kivy.garden.graph import Graph, MeshLinePlot
 from kivy.lang import Builder
 import scipy.integrate
+import vector
+from calib import calib
+import webbrowser
 
 ip = "http://192.168.1.1/"
 ap_name = "ESP32-Access-Point"
 value_file = "data\\values.csv"
 raw_data_file = "data\\raw_data.csv"
-rps = 100       #records per seconds
-tpr = 1/rps     #time in seconds per record
-rec_time = 5    #time in seconds for recording
+rps = 100       #recordings per seconds
+tpr = 1/rps     #time in seconds per recording
+rec_time = 20    #time in seconds for recording
+cal = calib()
+g = 9.80665
 
 root = None
 graphlayout = None
 
-def short(a: np.array, l: int):
-    x = len(a)/l
-    arr = []
-    for i in range(l):
-        arr.append(np.mean(a[int(x*i):int(x*i+1)]))
-    return arr
-
 class MyAddButton(Widget):
-    
-    def addGraph(self):
-        graphlayout.remove_widget(self)
-        graphlayout.add_widget(MyGraph())
-        graphlayout.add_widget(self)
-
-
-class MyGraph(Widget):
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.x_input = ObjectProperty(None)
+        self.y_input = ObjectProperty(None)
+        self.y_min = ObjectProperty(None)
+        self.y_max = ObjectProperty(None)
+
+    def addGraph(self):
+        graphlayout.remove_widget(self)
+        graphlayout.add_widget(MyGraph(self.x_input.text, self.y_input.text, self.y_min.text, self.y_max.text))
+        graphlayout.add_widget(self)
+
+class MyGraph(Widget):
+    def __init__(self, x, y, ymin, ymax, **kwargs):
+        super().__init__(**kwargs)
+        self.createGraph(x, y, ymin, ymax)
+
+    def createGraph(self, nx, ny, ymin, ymax):
         data = pd.read_csv(value_file)
         self.graph = self.children[0].children[1]
-        self.graph.xmax = np.max(data.time)
-        #self.graph.ymax = np.max(np.abs(data.posX))
         self.plot = MeshLinePlot()
-        time = data.time
-        pos = data.barheightT1
-        self.plot.points = [(time[x], pos[x]) for x in range(len(time))]
-        print(self.plot.points)
+        if nx == "" or ny == "":
+            self.plot.points = []
+            self.graph.add_plot(self.plot)
+            self.graph.ymax = int(ymax) if ymax != "" else math.ceil(np.max(y)) if math.ceil(np.max(y)) > 0 else 0
+            self.graph.ymin = int(ymin) if ymin != "" else math.floor(np.min(y)) if math.floor(np.min(y)) < 0 else 0
+            return
+        x = data[nx]
+        y = data[ny]
+        self.graph.xmax = np.max(x)
+        self.graph.ymax = int(ymax) if ymax != "" else math.ceil(np.max(y)) if math.ceil(np.max(y)) > 0 else 0
+        self.graph.ymin = int(ymin) if ymin != "" else math.floor(np.min(y)) if math.floor(np.min(y)) < 0 else 0
+        self.graph.xlabel = nx
+        self.graph.ylabel = ny
+        self.plot.points = [(x[i], y[i]) for i in range(len(x))]
         self.graph.add_plot(self.plot)
 
     def deleteSelf(self):
@@ -97,7 +110,7 @@ class MyGridLayout(Widget):
     def getValuesThread(self):
         self.println('try to download data from esp32 . . .')
         try:
-            r = requests.get(ip + "get", timeout=3)
+            r = requests.get(ip + "get")
         except:
             self.println('failed to download data, check connection!')
             sys.exit()
@@ -112,13 +125,13 @@ class MyGridLayout(Widget):
     def correctValues(self):
         self.println('correcting data')
         values = pd.read_csv(raw_data_file)
-        values["accX"] = round(values["accX"] - values["accX"][0], 2)
-        values["accY"] = round(values["accY"] - values["accY"][0], 2)
-        values["accZ"] = round(values["accZ"] - values["accZ"][0], 2)
-        values["rotX"] = round(values["rotX"] - values["rotX"][0], 2)
-        values["rotY"] = round(values["rotY"] - values["rotY"][0], 2)
-        values["rotZ"] = round(values["rotZ"] - values["rotZ"][0], 2)
-        values["time"] = round(values["time"] - values["time"][0], 2)
+        values["accX"] = [(cal["x_scale"]*x) + cal["x_offset"] for x in values["accX"]]
+        values["accY"] = [(cal["y_scale"]*x) + cal["y_offset"] for x in values["accY"]]
+        values["accZ"] = [(cal["z_scale"]*x) + cal["z_offset"] for x in values["accZ"]]
+        values["rotX"] = [x+cal["x_goffset"] for x in values["rotX"]]
+        values["rotY"] = [x+cal["y_goffset"] for x in values["rotY"]]
+        values["rotZ"] = [x+cal["z_goffset"] for x in values["rotZ"]]
+        values["time"] = values["time"] - values["time"][0]
         values.drop(values.tail(1).index, inplace=True)
         values.to_csv(value_file, index=False)
         self.completeValues()
@@ -134,24 +147,43 @@ class MyGridLayout(Widget):
             if i == 0:
                 h.append(0)
             else:
-                h.append(round(h[i-1] + (np.log(p[i]/p[i-1])/-((M*g)/(R*T[i]))), 2))
+                h.append(h[i-1] + (np.log(p[i]/p[i-1])/-((M*g)/(R*T[i]))))
         return h
 
     def completeValues(self):
         self.println('completing data')
         values = pd.read_csv(value_file)
-        values['velX'] = np.round(scipy.integrate.cumulative_trapezoid(values.accX, x=np.divide(values.time, 1000), initial=0), 2)
-        values['velY'] = np.round(scipy.integrate.cumulative_trapezoid(values.accY, x=np.divide(values.time, 1000), initial=0), 2)
-        values['velZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.accZ, x=np.divide(values.time, 1000), initial=0), 2)
-        values['posX'] = np.round(scipy.integrate.cumulative_trapezoid(values.velX, x=np.divide(values.time, 1000), initial=0), 2)
-        values['posY'] = np.round(scipy.integrate.cumulative_trapezoid(values.velY, x=np.divide(values.time, 1000), initial=0), 2)
-        values['posZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.velZ, x=np.divide(values.time, 1000), initial=0), 2)
-        values['rposX'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotX, x=np.divide(values.time, 1000), initial=0)*180/pi, 2)
-        values['rposY'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotY, x=np.divide(values.time, 1000), initial=0)*180/pi, 2)
-        values['rposZ'] = np.round(scipy.integrate.cumulative_trapezoid(values.rotZ, x=np.divide(values.time, 1000), initial=0)*180/pi, 2)
-        values['tposX'] = values['posX'] * np.cos(values['rposX'])
-        values['tposY'] = values['posY'] * np.cos(values['rposY'])
-        values['tposZ'] = values['posZ'] * np.cos(values['rposZ'])
+        values['rposX'] = scipy.integrate.cumulative_trapezoid(values.rotX, x=np.divide(values.time, 1000), initial=0)
+        values['rposY'] = scipy.integrate.cumulative_trapezoid(values.rotY, x=np.divide(values.time, 1000), initial=0)
+        values['rposZ'] = scipy.integrate.cumulative_trapezoid(values.rotZ, x=np.divide(values.time, 1000), initial=0)
+        values['velX'] = scipy.integrate.cumulative_trapezoid(values.accX, x=np.divide(values.time, 1000), initial=0)
+        values['velY'] = scipy.integrate.cumulative_trapezoid(values.accY, x=np.divide(values.time, 1000), initial=0)
+        values['velZ'] = scipy.integrate.cumulative_trapezoid(values.accZ, x=np.divide(values.time, 1000), initial=0)
+        values['posX'] = scipy.integrate.cumulative_trapezoid(values.velX, x=np.divide(values.time, 1000), initial=0)
+        values['posY'] = scipy.integrate.cumulative_trapezoid(values.velY, x=np.divide(values.time, 1000), initial=0)
+        values['posZ'] = scipy.integrate.cumulative_trapezoid(values.velZ, x=np.divide(values.time, 1000), initial=0)
+        taccX = []
+        taccY = []
+        taccZ = []
+        for i in range(len(values.accX)):
+            v = vector.obj(x=values.accX[i], y=values.accY[i], z=values.accZ[i])
+            v = v.rotateX(values.rposX[i])
+            v = v.rotateY(values.rposY[i])
+            v = v.rotateZ(values.rposZ[i])
+            taccX.append(v.x)
+            taccY.append(v.y)
+            taccZ.append(v.z)
+        values['taccX'] = taccX
+        values['taccY'] = taccY
+        values['taccZ'] = taccZ
+        values.taccZ = np.subtract(values.taccZ, g)
+        values['tvelX'] = scipy.integrate.cumulative_trapezoid(values.taccX, x=np.divide(values.time, 1000), initial=0)
+        values['tvelY'] = scipy.integrate.cumulative_trapezoid(values.taccY, x=np.divide(values.time, 1000), initial=0)
+        values['tvelZ'] = scipy.integrate.cumulative_trapezoid(values.taccZ, x=np.divide(values.time, 1000), initial=0)
+        values['tposX'] = scipy.integrate.cumulative_trapezoid(values.tvelX, x=np.divide(values.time, 1000), initial=0)
+        values['tposY'] = scipy.integrate.cumulative_trapezoid(values.tvelY, x=np.divide(values.time, 1000), initial=0)
+        values['tposZ'] = scipy.integrate.cumulative_trapezoid(values.tvelZ, x=np.divide(values.time, 1000), initial=0)
+
         values['barheightT1'] = self.barheight(values.press, values.temp1)
         values['barheightT2'] = self.barheight(values.press, values.temp2)
         values.drop(0)
@@ -160,6 +192,9 @@ class MyGridLayout(Widget):
 
     def printValues(self):
         self.print(pd.read_csv(value_file))
+    
+    def openValues(self):
+        webbrowser.open(value_file)
 
     def println(self, text, type='info'):
         if type == 'info':
